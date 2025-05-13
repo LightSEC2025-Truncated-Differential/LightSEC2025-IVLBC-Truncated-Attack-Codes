@@ -1,0 +1,187 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+#define BLOCK_SIZE   16
+#define NUM_COLUMNS   4
+#define MAX_ROUNDS    7
+#define MAX_DEPTH     (NUM_COLUMNS * MAX_ROUNDS)
+
+typedef struct { uint8_t active[BLOCK_SIZE]; } state_t;
+
+static int total_rounds;
+static const state_t *target_mask;
+static double total_prob;
+static int path_count;
+
+static int rec_i[MAX_DEPTH];
+static int rec_j[MAX_DEPTH];
+
+void enumerate_rounds(const state_t *state, int round, double acc_prob, int depth);
+double P_ij(int i, int j);
+void PN(const state_t *in, state_t *out);
+void mc_rec(int col, const state_t *afterPN, const state_t *partial,
+            double acc_prob, int round, int depth);
+
+double P_ij(int i, int j) {
+    if (i == 0 && j == 0) return 1.0;
+    if (j > i) return 0.0;
+    const double inv15   = 1.0/15.0;
+    const double inv15_2 = inv15 * inv15;
+    const double inv15_3 = inv15_2 * inv15;
+    switch(i) {
+      case 4:
+        switch(j) {
+          case 0: return 1 - 4*inv15 + 10*inv15_2 - 6*inv15_3;
+          case 1: return inv15 - 4*inv15_2 + 3*inv15_3;
+          case 2: return inv15_2 - inv15_3;
+          default: return 0.0;
+        }
+      case 3:
+        switch(j) {
+          case 0: return 1 - 4*inv15 + 3*inv15_2;
+          case 1: return inv15 - inv15_2;
+          case 3: return inv15_2;
+          default: return 0.0;
+        }
+      case 2:
+        switch(j) {
+          case 0: return 1 - inv15;
+          case 2: return inv15;
+          default: return 0.0;
+        }
+      case 1:
+        return (j == 1) ? 1.0 : 0.0;
+      default:
+        return (j == 0) ? 1.0 : 0.0;
+    }
+}
+
+void PN(const state_t *in, state_t *out) {
+    static const int dest[BLOCK_SIZE] = {
+         0,7,10,13, 4,11,14,1, 8,15,2,5, 12,3,6,9
+    };
+    for (int i = 0; i < BLOCK_SIZE; ++i)
+        out->active[i] = in->active[ dest[i] ];
+}
+
+void mc_rec(int col, const state_t *afterPN, const state_t *partial,
+            double acc_prob, int round, int depth) {
+    if (col == NUM_COLUMNS) {
+        if (round + 1 == total_rounds) {
+            for (int b = 0; b < BLOCK_SIZE; ++b)
+                if (partial->active[b] != target_mask->active[b])
+                    return;
+            total_prob += acc_prob;
+            printf("%2d) P=%.16f : ", ++path_count, acc_prob);
+            for (int d = 0; d < depth; ++d) {
+                printf("P%d%d", rec_i[d], rec_j[d]);
+                if ((d+1) % NUM_COLUMNS == 0 && d+1 < depth) printf(" - ");
+                else if (d+1 < depth) printf(" ");
+            }
+            printf("\n");
+        } else {
+            enumerate_rounds(partial, round + 1, acc_prob, depth);
+        }
+        return;
+    }
+
+    int idx = col * 4;
+    int i_cnt = 0;
+    for (int r = 0; r < 4; ++r)
+        i_cnt += afterPN->active[idx + r];
+
+    if (i_cnt == 0) {
+        rec_i[depth] = 0; rec_j[depth] = 0;
+        state_t n = *partial;
+        mc_rec(col+1, afterPN, &n, acc_prob * P_ij(0,0), round, depth+1);
+        return;
+    }
+    if (i_cnt == 1) {
+        double p = P_ij(1,1);
+        rec_i[depth] = 1; rec_j[depth] = 1;
+        state_t n = *partial;
+        for (int r = 0; r < 4; ++r)
+            n.active[idx + r] = afterPN->active[idx + r] ? 0 : 1;
+        mc_rec(col+1, afterPN, &n, acc_prob * p, round, depth+1);
+        return;
+    }
+    if (i_cnt == 2) {
+        double p0 = P_ij(2,0);
+        if (p0 > 0) {
+            rec_i[depth] = 2; rec_j[depth] = 0;
+            state_t n0 = *partial;
+            for (int r = 0; r < 4; ++r) n0.active[idx + r] = 1;
+            mc_rec(col+1, afterPN, &n0, acc_prob * p0, round, depth+1);
+        }
+        double p2 = P_ij(2,2);
+        if (p2 > 0) {
+            rec_i[depth] = 2; rec_j[depth] = 2;
+            state_t n2 = *partial;
+            for (int r = 0; r < 4; ++r) n2.active[idx + r] = afterPN->active[idx + r];
+            mc_rec(col+1, afterPN, &n2, acc_prob * p2, round, depth+1);
+        }
+        return;
+    }
+
+
+    for (int j = 0; j <= i_cnt; ++j) {
+        double p = P_ij(i_cnt, j);
+        if (p <= 0) continue;
+        rec_i[depth] = i_cnt;
+        rec_j[depth] = j;
+
+        if (j == i_cnt) {
+            state_t n = *partial;
+            for (int k = 0; k < 4; ++k) n.active[idx + k] = 1;
+            for (int r = 0; r < 4; ++r)
+                if (afterPN->active[idx + r])
+                    n.active[idx + r] = 0;
+            mc_rec(col+1, afterPN, &n, acc_prob * p, round, depth+1);
+        } else {
+            int sel[4];
+            void comb(int d, int s) {
+                if (d == j) {
+                    state_t n = *partial;
+                    for (int k = 0; k < 4; ++k) n.active[idx + k] = 1;
+                    for (int t = 0; t < j; ++t) n.active[idx + sel[t]] = 0;
+                    mc_rec(col+1, afterPN, &n, acc_prob * p, round, depth+1);
+                    return;
+                }
+                for (int r = s; r < 4; ++r) {
+                    sel[d] = r;
+                    comb(d+1, r+1);
+                }
+            }
+            comb(0, 0);
+        }
+    }
+}
+
+void enumerate_rounds(const state_t *state, int round, double acc_prob, int depth) {
+    if (round >= total_rounds) return;
+    state_t afterPN = {0}, partial = {0};
+    PN(state, &afterPN);
+    mc_rec(0, &afterPN, &partial, acc_prob, round, depth);
+}
+
+int main() {
+    state_t in = {0};
+    in.active[4] = 1;
+    //...
+
+    state_t tgt = {0};
+
+    tgt.active[4]=1;
+    //...
+
+    target_mask = &tgt;
+
+    total_rounds = 2;
+    total_prob   = 0.0;
+    path_count   = 0;
+
+    enumerate_rounds(&in, 0, 1.0, 0);
+    printf("Total %d-round P = %.30f\n", total_rounds, total_prob);
+    return 0;
+}

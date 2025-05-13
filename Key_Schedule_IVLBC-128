@@ -28,11 +28,7 @@ int main() {
 
     int tracked[] = {
         16,17,18,19,
-        28,29,30,31,
-        40,41,42,43,
-        44,45,46,47,
-        52,53,54,55,
-        56,57,57,59
+        //...
 
     };
     int n_tracked = sizeof(tracked)/sizeof(*tracked);
@@ -65,7 +61,7 @@ int main() {
         }
     }
 
-    printf("\n=== Sonuç (rounds=%d) ===\n", rounds);
+    printf("\n=== outcome (rounds=%d) ===\n", rounds);
 
     for (int group = 0; group < 16; group++) {
         int base = group * 4;

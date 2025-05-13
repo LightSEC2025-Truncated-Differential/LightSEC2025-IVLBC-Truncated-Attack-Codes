@@ -23,7 +23,7 @@ void rotate_and_swap_80(int k[80], int tag[80]) {
 
 int main() {
     int k[80], tag[80] = {0};
-    int rounds = 2;  // Örnek tur sayısı
+    int rounds = 2;
 
     int tracked[] = {
                       0,1,2,3
@@ -40,7 +40,7 @@ int main() {
         k[i] = 79 - i;
     }
 
-    printf("=== Başlangıç ===\n");
+    printf("=== Initial ===\n");
     for (int i = 0; i < 80; i++) {
         if (tag[i])
             printf("*%3d ", k[i]);
@@ -58,7 +58,7 @@ int main() {
         }
     }
 
-    printf("\n=== Sonuç (rounds=%d) ===\n", rounds);
+    printf("\n=== outcome (rounds=%d) ===\n", rounds);
     for (int group = 0; group < 16; group++) {
         int base = group * 4;
         printf("e%d:", group);

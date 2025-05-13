@@ -1,0 +1,79 @@
+#include <stdio.h>
+#include <string.h>
+
+void rotate_and_swap_80(int k[80], int tag[80]) {
+    int left[40], right[40], rotated[40];
+    int tleft[40], tright[40], trot[40];
+
+    memcpy(left,   k,        40 * sizeof(int));
+    memcpy(right,  k + 40,   40 * sizeof(int));
+    memcpy(tleft,  tag,      40 * sizeof(int));
+    memcpy(tright, tag + 40, 40 * sizeof(int));
+
+    for (int i = 0; i < 40; i++) {
+        rotated[i] = left[(i + 11) % 40];
+        trot[i]    = tleft[(i + 11) % 40];
+    }
+
+    memcpy(k,        right,    40 * sizeof(int));
+    memcpy(k + 40,   rotated,  40 * sizeof(int));
+    memcpy(tag,      tright,   40 * sizeof(int));
+    memcpy(tag + 40, trot,     40 * sizeof(int));
+}
+
+int main() {
+    int k[80], tag[80] = {0};
+    int rounds = 2;  // Örnek tur sayısı
+
+    int tracked[] = {
+                      0,1,2,3
+                    //...
+
+
+    };
+    int n_tracked = sizeof(tracked) / sizeof(*tracked);
+    for (int i = 0; i < n_tracked; i++) {
+        tag[tracked[i]] = 1;
+    }
+
+    for (int i = 0; i < 80; i++) {
+        k[i] = 79 - i;
+    }
+
+    printf("=== Başlangıç ===\n");
+    for (int i = 0; i < 80; i++) {
+        if (tag[i])
+            printf("*%3d ", k[i]);
+        else
+            printf(" %3d ", k[i]);
+        if ((i + 1) % 16 == 0 || i == 63) printf("\n");
+    }
+
+    for (int r = 0; r < rounds; r++) {
+        rotate_and_swap_80(k, tag);
+
+        int allFirst = tag[40] && tag[41] && tag[42] && tag[43];
+        if (!allFirst) {
+            tag[40] = tag[41] = tag[42] = tag[43] = 0;
+        }
+    }
+
+    printf("\n=== Sonuç (rounds=%d) ===\n", rounds);
+    for (int group = 0; group < 16; group++) {
+        int base = group * 4;
+        printf("e%d:", group);
+        for (int j = 0; j < 4; j++) {
+            if (tag[base + j]) printf(" *%d", k[base + j]);
+            else               printf(" %d",  k[base + j]);
+            if (j < 3) printf(",");
+        }
+        printf("\n");
+    }
+    printf("\nRemaining 16 bits:\n");
+    for (int i = 64; i < 80; i++) {
+        if (tag[i]) printf("*%3d ", k[i]);
+        else        printf(" %3d ", k[i]);
+        if ((i - 64 + 1) % 16 == 0) printf("\n");
+    }
+    return 0;
+}

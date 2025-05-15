@@ -1,0 +1,45 @@
+#include <stdio.h>
+
+// 4x4 S-box definition
+unsigned char S[16] = {
+    0x0, 0xF, 0xE, 0x5,
+    0xD, 0x3, 0x6, 0xC,
+    0xB, 0x9, 0xA, 0x8,
+    0x7, 0x4, 0x2, 0x1
+};
+
+int main() {
+    // Difference Distribution Table (DDT)
+    int DDT[16][16] = {0};
+
+    // Compute the DDT
+    for (int delta_in = 0; delta_in < 16; delta_in++) {
+        for (int x = 0; x < 16; x++) {
+            int x2 = x ^ delta_in;
+            int y  = S[x];
+            int y2 = S[x2];
+            int delta_out = y ^ y2;
+            DDT[delta_in][delta_out]++;
+        }
+    }
+
+    // Print the DDT
+    printf("    ");
+    for (int j = 0; j < 16; j++) {
+        printf(" %2X", j);
+    }
+    printf("\n");
+    printf("---");
+    for (int j = 0; j < 16; j++) printf("----");
+    printf("\n");
+
+    for (int i = 0; i < 16; i++) {
+        printf("%2X |", i);
+        for (int j = 0; j < 16; j++) {
+            printf(" %2d", DDT[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}

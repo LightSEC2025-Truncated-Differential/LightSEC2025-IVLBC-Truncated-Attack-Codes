@@ -1,0 +1,97 @@
+#include <stdio.h>
+#include <stdint.h>
+
+
+static inline uint8_t gf_add(uint8_t a, uint8_t b) {
+    return a ^ b;
+}
+
+uint8_t gf_mul(uint8_t a, uint8_t b) {
+    uint8_t res = 0;
+    while (b) {
+        if (b & 1) res ^= a;
+        b >>= 1;
+        if (a & 0x8)
+            a = (a << 1) ^ 0x13;
+        else
+            a <<= 1;
+    }
+    return res & 0xF;
+}
+static const uint8_t MC[4][4] = {
+    { 0, 1, 1, 1 },
+    { 1, 0, 1, 1 },
+    { 1, 1, 0, 1 },
+    { 1, 1, 1, 0 }
+};
+
+int main(void) {
+    uint8_t in[4], out[4];
+    uint64_t count_passive[5][5] = {0};
+
+    in[1] = in[2] = in[3] = 0;
+    for (in[0] = 1; in[0] <= 15; in[0]++) {
+        // MixColumns
+        for (int i = 0; i < 4; i++) {
+            uint8_t acc = 0;
+            for (int j = 0; j < 4; j++)
+                acc = gf_add(acc, gf_mul(MC[i][j], in[j]));
+            out[i] = acc;
+        }
+        int z = 0;
+        for (int i = 0; i < 4; i++) if (out[i] == 0) z++;
+        count_passive[1][z]++;
+    }
+
+    in[2] = in[3] = 0;
+    for (in[0] = 1; in[0] <= 15; in[0]++)
+    for (in[1] = 1; in[1] <= 15; in[1]++) {
+        for (int i = 0; i < 4; i++) {
+            uint8_t acc = 0;
+            for (int j = 0; j < 4; j++)
+                acc = gf_add(acc, gf_mul(MC[i][j], in[j]));
+            out[i] = acc;
+        }
+        int z = 0;
+        for (int i = 0; i < 4; i++) if (out[i] == 0) z++;
+        count_passive[2][z]++;
+    }
+    in[3] = 0;
+    for (in[0] = 1; in[0] <= 15; in[0]++)
+    for (in[1] = 1; in[1] <= 15; in[1]++)
+    for (in[2] = 1; in[2] <= 15; in[2]++) {
+        for (int i = 0; i < 4; i++) {
+            uint8_t acc = 0;
+            for (int j = 0; j < 4; j++)
+                acc = gf_add(acc, gf_mul(MC[i][j], in[j]));
+            out[i] = acc;
+        }
+        int z = 0;
+        for (int i = 0; i < 4; i++) if (out[i] == 0) z++;
+        count_passive[3][z]++;
+    }
+
+    for (in[0] = 1; in[0] <= 15; in[0]++)
+    for (in[1] = 1; in[1] <= 15; in[1]++)
+    for (in[2] = 1; in[2] <= 15; in[2]++)
+    for (in[3] = 1; in[3] <= 15; in[3]++) {
+        for (int i = 0; i < 4; i++) {
+            uint8_t acc = 0;
+            for (int j = 0; j < 4; j++)
+                acc = gf_add(acc, gf_mul(MC[i][j], in[j]));
+            out[i] = acc;
+        }
+        int z = 0;
+        for (int i = 0; i < 4; i++) if (out[i] == 0) z++;
+        count_passive[4][z]++;
+    }
+
+    for (int k = 1; k <= 4; k++) {
+        printf("=== input %d active nibble ===\n", k);
+        for (int z = 0; z <= 4; z++) {
+            printf("  when there is %d pasive nibble: %llu\n",z, (unsigned long long)count_passive[k][z]);
+        }
+    }
+
+    return 0;
+}
